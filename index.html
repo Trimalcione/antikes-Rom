@@ -88,6 +88,13 @@
        ➜ zum mittelalterlichen Rom
     </a>
 </div>
+<div style="margin-top:12px;">
+    <a href="https://trimalcione.github.io/Rom-Bilder/" 
+       target="_blank" 
+       style="font-weight:bold; text-decoration:none; color:#0044aa;">
+       ➜ zur Renaissance in Rom
+    </a>
+</div>
 
     <h4>Admin</h4>
     <label>
@@ -425,22 +432,18 @@ points.forEach(p => {
     });
 });
 
-
-
-
-
 // ------------------------------------------------------------
-// 9. Slider (kompakt: 800–1600 + heute)
+// 9. Slider (kompakt: -800 bis + 600 + heute)
 // ------------------------------------------------------------
 function initSlider() {
     const slider = document.getElementById("time-slider");
 
     // künstliche Skala:
-    // 800–1600 = echte Jahre
+    // -800- = echte Jahre
     // 1601 = "heute"
-    slider.min = 800;
-    slider.max = 1601;
-    slider.value = 1601;
+    slider.min = -800;
+    slider.max = 601;
+    slider.value = 601;
 
     document.getElementById("slider-label").textContent = "Jahr: heute";
 }
@@ -454,8 +457,8 @@ function applySlider() {
 
     let year;
 
-    // 1601 steht für "heute"
-    if (val === 1601) {
+    // 801 steht für "heute"
+    if (val === 601) {
         year = currentYear;
         document.getElementById("slider-label").textContent = "Jahr: heute";
     } else {
@@ -477,6 +480,10 @@ function applySlider() {
 
 document.getElementById("time-slider")
     .addEventListener("input", applySlider);
+
+
+
+
 
 // ------------------------------------------------------------
 // 10. Admin-Modus
@@ -512,4 +519,5 @@ map.on('click', function(e) {
 </script>
 </body>
 </html>
+
 
