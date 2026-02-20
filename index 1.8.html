@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interaktive Rom-Karte — Layer Switcher unten Sidebar</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
+
+<style>
+    body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+    }
+
+    #map {
+        flex: 3;
+        position: relative;
+    }
+
+    #coords-display {
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        background: rgba(255,255,255,0.85);
+        padding: 6px 10px;
+        border-radius: 4px;
+        font-size: 14px;
+        border: 1px solid #aaa;
+        z-index: 1000;
+    }
+
+    #sidebar {
+        flex: 1;
+        padding: 12px;
+        background: #f5f5f5;
+        border-top: 2px solid #ccc;
+        height: 220px;
+        overflow-y: auto;
+    }
+
+    .info-box {
+        padding: 8px;
+        background: white;
+        border-radius: 6px;
+        border: 1px solid #aaa;
+        width: 240px;
+    }
+
+    .marker-icon img {
+        width: 48px;
+        height: 48px;
+        transition: transform 0.2s ease, filter 0.2s ease;
+    }
+
+    .marker-icon img:hover {
+        transform: scale(1.35);
+        filter: drop-shadow(0 0 6px rgba(0,0,0,0.4));
+    }
+
+    .leaflet-tooltip.hover-popup {
+        background: white;
+        border: 1px solid #aaa;
+        border-radius: 6px;
+        padding: 4px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+</style>
+</head>
+
+<body>
+
+<div id="map">
+    <div id="coords-display">Koordinaten: –</div>
+</div>
+
+<div id="sidebar">
+
+    <h4>Zeitleiste</h4>
+    <input type="range" id="time-slider" min="" max="" value="" step="1" style="width:100%;">
+    <div id="slider-label"></div>
+<div style="margin-top:12px;">
+    <a href="https://trimalcione.github.io/Mittelalter-Rom/" 
+       target="_blank" 
+       style="font-weight:bold; text-decoration:none; color:#0044aa;">
+       ➜ zum mittelalterlichen Rom
+    </a>
+</div>
+
+    <h4>Admin</h4>
+    <label>
+        <input type="checkbox" id="admin-mode">
+        Admin-Modus aktivieren
+    </label>
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+// ------------------------------------------------------------
+// 1. Karte
+// ------------------------------------------------------------
+const map = L.map('map').setView([41.8933, 12.4829], 15);
+
+// ------------------------------------------------------------
+// 2. Basemaps
+// ------------------------------------------------------------
+const baseVoyager = L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+    {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap-Mitwirkende &copy; CARTO'
+    }
+);
+
+
+
+const baseOSM = L.tileLayer(
+    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap-Mitwirkende'
+    }
+);
+
+// Standard-Basemap aktivieren
+baseVoyager.addTo(map);
+
+// Layer-Switcher
+const baseMaps = {
+    "Carto Voyager": baseVoyager,
+    "OpenStreetMap": baseOSM
+};
+
+L.control.layers(baseMaps, null, { collapsed: false }).addTo(map);
+
+
+
+// ------------------------------------------------------------
+// 10. Beim Wechsel auf OpenStreetMap → Slider auf "heute"
+// ------------------------------------------------------------
+map.on('baselayerchange', function(e) {
+    const slider = document.getElementById("time-slider");
+    const currentYear = new Date().getFullYear();
+
+    if (e.name === "OpenStreetMap") {
+        slider.value = 1601;   // unser "heute"-Marker
+        applySlider();
+    }
+});
+
+// ------------------------------------------------------------
+// 3. Koordinatenanzeige
+// ------------------------------------------------------------
+const coordsDisplay = document.getElementById('coords-display');
+
+map.on('mousemove', e => {
+    coordsDisplay.textContent =
+        `Koordinaten: ${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`;
+});
+
+// ------------------------------------------------------------
+// 4. Zeitfunktion
+// ------------------------------------------------------------
+function yearToDecimal(year, month = 1, day = 1) {
+    return year + (month - 1) / 12 + (day - 1) / 365;
+}
+
+// ------------------------------------------------------------
+// 5. Icons
+// ------------------------------------------------------------
+function makeIcon(url) {
+    return L.divIcon({
+        className: "marker-icon",
+        html: `<img src="${url}" alt="">`,
+        iconSize: [64, 64],
+        iconAnchor: [32, 32]
+    });
+}
+
+const icons = { 
+    tempel: makeIcon('https://cdn-icons-png.flaticon.com/512/3176/3176298.png'),
+    thermen: makeIcon('https://cdn-icons-png.flaticon.com/512/854/854878.png'),
+    strassen: makeIcon('https://cdn-icons-png.flaticon.com/512/684/684908.png'),
+    foren: makeIcon('https://cdn-icons-png.flaticon.com/512/3176/3176298.png'),
+    kaiserzeit: makeIcon('https://cdn-icons-png.flaticon.com/512/1998/1998592.png'),
+    republik: makeIcon('https://cdn-icons-png.flaticon.com/512/1998/1998584.png'),
+    sonstiges: makeIcon('https://cdn-icons-png.flaticon.com/512/1828/1828884.png'),
+    guelfen: makeIcon('https://openmoji.org/data/color/svg/1F981.svg'),
+    ghibellinen: makeIcon('https://openmoji.org/data/color/svg/1F985.svg'),
+    palazzo: makeIcon('Palazzo-gelb3.svg')
+};  
+
+
+
+
+
+// ------------------------------------------------------------
+// 6. Punkte (ALLE Marker integriert)
+// ------------------------------------------------------------
+const points = [
+
+    // --- Antike / Kaiserzeit / Republik ---
+    {
+        coords: [41.89021, 12.49223],
+        title: "Kolosseum",
+        date: "80 n. Chr. – heute",
+        startValue: yearToDecimal(80),
+        endValue: new Date().getFullYear(),
+        text: "Das größte Amphitheater der Antike.",
+        img: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/de/Colosseo_2020.jpg/320px-Colosseo_2020.jpg",
+        symbol: "kaiserzeit"
+    },
+    {
+        coords: [41.89246, 12.48533],
+        title: "Forum Romanum",
+        date: "7.–5. Jh. v. Chr.",
+        startValue: -700,
+        endValue: -401,
+        text: "Politisches Zentrum der frühen römischen Geschichte.",
+        img: "https://upload.wikimedia.org/wikipedia/commons/6/66/ForumRomana1.jpg",
+        symbol: "foren"
+    },
+    {
+        coords: [41.89217, 12.47925],
+        title: "Theater des Marcellus",
+        date: "13 v. Chr. – heute",
+        startValue: yearToDecimal(-13),
+        endValue: new Date().getFullYear(),
+        text: "Theaterbau aus der späten Republik.",
+        img: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Teatro_di_Marcello_intero.jpg/120px-Teatro_di_Marcello_intero.jpg",
+        symbol: "republik"
+    },
+    {
+        coords: [41.90311, 12.46630],
+        title: "Engelsburg",
+        date: "139 n. Chr. – heute",
+        startValue: yearToDecimal(139),
+        endValue: new Date().getFullYear(),
+        text: "Mausoleum, später Festung und Papstresidenz.",
+        img: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/Castel_Sant%27Angelo_Rome.jpg/320px-Castel_Sant%27Angelo_Rome.jpg",
+        symbol: "sonstiges"
+    },
+    {
+        coords: [41.90278, 12.48062],
+        title: "Via del Corso",
+        date: "1.–3. Jh. n. Chr.",
+        startValue: 0,
+        endValue: 300,
+        text: "Wichtige Nord-Süd-Achse durch Rom.",
+        img: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/Via_del_Corso_(52501354470).jpg/330px-Via_del_Corso_(52501354470).jpg",
+        symbol: "strassen"
+    },
+
+    // --- Moderne ---
+    {
+        coords: [41.89500, 12.47688],
+        title: "Katzenasyl Torre Argentina",
+        date: "1980 – heute",
+        startValue: yearToDecimal(1980),
+        endValue: new Date().getFullYear(),
+        text: "Unsere Katzis.",
+        img: "https://raw.githubusercontent.com/Trimalcione/rom-bilder/refs/heads/main/argentina.jpg",
+        symbol: "kaiserzeit"
+    },
+
+    // --- Palazzo Sforza Cesarini (mehrere Epochen) ---
+    {
+        coords: [41.89843, 12.46726],
+        title: "Palazzo Sforza Cesarini",
+        date: "1458 – 1491",
+        startValue: yearToDecimal(1458),
+        endValue: yearToDecimal(1491),
+        text: "Residenz Rodrigo Borgias als Kardinal und Vizekanzler.",
+        img: "https://upload.wikimedia.org/wikipedia/commons/6/6c/Pope_Alexander_Vi.jpg",
+        symbol: "palazzo"
+    },
+    {
+        coords: [41.89843, 12.46726],
+        title: "Palazzo Sforza Cesarini",
+        date: "1492 – 1503",
+        startValue: yearToDecimal(1492),
+        endValue: yearToDecimal(1505),
+        text: "Residenz Kardinal Ascanio Sforza.",
+        img: "https://upload.wikimedia.org/wikipedia/commons/0/0a/SFORZA_ASCANIO.jpg",
+        symbol: "palazzo"
+    },
+    {
+        coords: [41.89843, 12.46726],
+        title: "Palazzo Sforza Cesarini",
+        date: "1503 – 1513",
+        startValue: yearToDecimal(1505),
+        endValue: yearToDecimal(1513),
+        text: "Residenz der Nepoten von Julius II.",
+        img: "https://upload.wikimedia.org/wikipedia/commons/a/a1/Young_Man_Apple.jpg",
+        symbol: "palazzo"
+    },
+    {
+        coords: [41.89843, 12.46726],
+        title: "Palazzo Sforza Cesarini",
+        date: "1513 – 1920",
+        startValue: yearToDecimal(1513),
+        endValue: yearToDecimal(1919),
+        text: "Residenz der Sforza-Cesarini.",
+        img: "https://ts1.mm.bing.net/th?id=OIP.83XdZggJbtcawdiKGyVTlQHaIn&pid=15.1",
+        symbol: "palazzo"
+    },
+    {
+        coords: [41.89843, 12.46726],
+        title: "Palazzo Sforza Cesarini",
+        date: "1920 – heute",
+        startValue: yearToDecimal(1920),
+        endValue: new Date().getFullYear(),
+        text: "Staatlich (ab 1920).",
+        img: "https://upload.wikimedia.org/wikipedia/commons/0/03/Flag_of_Italy.svg",
+        symbol: "palazzo"
+    },
+
+    // --- Guelfen ---
+    {
+        coords: [41.88591, 12.50533],
+        title: "Lateran (Guelfen)",
+        date: "Mittelalter",
+        startValue: yearToDecimal(1100),
+        endValue: yearToDecimal(1500),
+        text: "Zentrum der guelfischen Macht.",
+        img: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/Lateran_Basilica.jpg/320px-Lateran_Basilica.jpg",
+        symbol: "guelfen"
+    },
+    {
+        coords: [41.89396, 12.48287],
+        title: "Santa Maria in Aracoeli (Guelfen)",
+        date: "Mittelalter",
+        startValue: yearToDecimal(1100),
+        endValue: yearToDecimal(1500),
+        text: "Kirche der guelfischen Familien.",
+        img: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/Santa_Maria_in_Aracoeli.jpg/320px-Santa_Maria_in_Aracoeli.jpg",
+        symbol: "guelfen"
+    },
+    {
+        coords: [41.91093, 12.47682],
+        title: "Piazza del Popolo (Guelfen)",
+        date: "Mittelalter",
+        startValue: yearToDecimal(1100),
+        endValue: yearToDecimal(1500),
+        text: "Kontrolle über die nördlichen Stadttore.",
+        img: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Piazza_del_Popolo_Rome.jpg/320px-Piazza_del_Popolo_Rome.jpg",
+        symbol: "guelfen"
+    },
+
+    // --- Ghibellinen ---
+    {
+        coords: [41.89250, 12.48231],
+        title: "Campidoglio (Ghibellinen)",
+        date: "Mittelalter",
+        startValue: yearToDecimal(1100),
+        endValue: yearToDecimal(1500),
+        text: "Sitz des römischen Senats.",
+        img: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/Campidoglio_Rome.jpg/320px-Campidoglio_Rome.jpg",
+        symbol: "ghibellinen"
+    },
+    {
+        coords: [41.90311, 12.46630],
+        title: "Castel Sant’Angelo (Ghibellinen)",
+        date: "Mittelalter",
+        startValue: yearToDecimal(1100),
+        endValue: yearToDecimal(1500),
+        text: "Kaiserliche Garnison.",
+        img: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/Castel_Sant%27Angelo_Rome.jpg/320px-Castel_Sant%27Angelo_Rome.jpg",
+        symbol: "ghibellinen"
+    },
+    {
+        coords: [41.89536, 12.48841],
+        title: "Torre delle Milizie (Ghibellinen)",
+        date: "Mittelalter",
+        startValue: yearToDecimal(1100),
+        endValue: yearToDecimal(1500),
+        text: "Turm der Frangipani.",
+        img: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/88/Mercati_di_traiano%2C_torre_delle_milizie.JPG/640px-Mercati_di_traiano%2C_torre_delle_milizie.JPG",
+        symbol: "ghibellinen"
+    }
+];
+
+// ------------------------------------------------------------
+// 8. Marker erzeugen
+// ------------------------------------------------------------
+let markers = [];
+
+points.forEach(p => {
+    const marker = L.marker(p.coords, { icon: icons[p.symbol] });
+
+    const box = `
+        <div class="info-box">
+            <div class="info-title">${p.title}</div>
+            <div class="info-date">${p.date}</div>
+            <img src="${p.img}" width="200"><br>
+            ${p.text}
+        </div>
+    `;
+
+    marker.bindPopup(box);
+
+    const hoverBox = `
+        <div style="pointer-events:none;">
+            <img src="${p.img}" style="width:140px; border-radius:4px;">
+        </div>
+    `;
+
+    marker.bindTooltip(hoverBox, {
+        permanent: false,
+        direction: "top",
+        offset: [0, -20],
+        opacity: 0.95,
+        className: "hover-popup"
+    });
+
+    marker.addTo(map);
+
+    markers.push({
+        marker,
+        symbol: p.symbol,
+        startValue: p.startValue,
+        endValue: p.endValue
+    });
+});
+
+
+
+
+
+// ------------------------------------------------------------
+// 9. Slider (kompakt: 800–1600 + heute)
+// ------------------------------------------------------------
+function initSlider() {
+    const slider = document.getElementById("time-slider");
+
+    // künstliche Skala:
+    // 800–1600 = echte Jahre
+    // 1601 = "heute"
+    slider.min = 800;
+    slider.max = 1601;
+    slider.value = 1601;
+
+    document.getElementById("slider-label").textContent = "Jahr: heute";
+}
+
+initSlider();
+
+function applySlider() {
+    const slider = document.getElementById("time-slider");
+    const currentYear = new Date().getFullYear();
+    let val = parseInt(slider.value);
+
+    let year;
+
+    // 1601 steht für "heute"
+    if (val === 1601) {
+        year = currentYear;
+        document.getElementById("slider-label").textContent = "Jahr: heute";
+    } else {
+        year = val;
+        document.getElementById("slider-label").textContent = `Jahr: ${year}`;
+    }
+
+    // Marker filtern
+    markers.forEach(obj => {
+        const visible = obj.startValue <= year && obj.endValue >= year;
+
+        if (visible) {
+            if (!map.hasLayer(obj.marker)) obj.marker.addTo(map);
+        } else {
+            if (map.hasLayer(obj.marker)) map.removeLayer(obj.marker);
+        }
+    });
+}
+
+document.getElementById("time-slider")
+    .addEventListener("input", applySlider);
+
+// ------------------------------------------------------------
+// 10. Admin-Modus
+// ------------------------------------------------------------
+const adminToggle = document.getElementById('admin-mode');
+
+map.on('click', function(e) {
+    if (!adminToggle.checked) return;
+
+    const lat = e.latlng.lat.toFixed(5);
+    const lng = e.latlng.lng.toFixed(5);
+
+    const example = `
+{
+    coords: [${lat}, ${lng}],
+    title: "NEUER TITEL",
+    date: "DATUM / ZEITSPANNE",
+    startValue: yearToDecimal(1980),
+    endValue: new Date().getFullYear(),
+    text: "Freitext.",
+    img: "BILD-URL",
+    symbol: "tempel"
+}
+    `.trim();
+
+    L.marker([lat, lng]).addTo(map)
+        .bindPopup(
+            "<b>Neuer Marker gesetzt</b><br><br>" +
+            `<textarea style='width:100%;height:220px;'>${example}</textarea>`
+        )
+        .openPopup();
+});
+</script>
+</body>
+</html>
